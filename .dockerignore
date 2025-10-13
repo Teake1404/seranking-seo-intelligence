@@ -1,0 +1,14 @@
+# Don't copy these to Docker image
+*.md
+*.log
+*.db
+*.json
+__pycache__/
+*.pyc
+.git/
+.env
+report_history.json
+nike_seo.db
+daily_report.log
+
+

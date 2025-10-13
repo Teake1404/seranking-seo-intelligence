@@ -1,0 +1,15 @@
+# Core Flask API
+flask==2.3.3
+flask-cors==4.0.0
+gunicorn==21.2.0
+
+# HTTP Requests
+requests==2.31.0
+aiohttp>=3.9.0
+
+# Claude AI Integration
+anthropic>=0.40.0
+
+# Utilities
+python-dateutil==2.8.2
+python-dotenv==1.0.0

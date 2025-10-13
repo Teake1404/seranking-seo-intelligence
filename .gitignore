@@ -1,0 +1,36 @@
+# Environment variables and secrets
+.env
+.env.local
+.env.production
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test files
+test_*.py
+*_test.py
+
+# Local development
+*.log
+
+# Temporary files
+*.tmp
+*.bak
+OPTIMIZATION_SUMMARY.md
