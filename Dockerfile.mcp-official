@@ -1,0 +1,27 @@
+# Official SEranking MCP Server
+FROM node:18-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Install dependencies
+RUN apk add --no-cache git
+
+# Clone the official SEranking MCP server
+RUN git clone https://github.com/seranking/seo-data-api-mcp-server.git .
+
+# Install dependencies
+RUN npm install
+
+# Build the project
+RUN npm run build
+
+# Set environment variables
+ENV SERANKING_API_TOKEN=b931695c-9e38-cde4-4d4b-49eeb217118f
+ENV SERANKING_API_BASE=https://api4.seranking.com
+
+# Expose port
+EXPOSE 3000
+
+# Start the official MCP server
+CMD ["npm", "run", "start:http"]
