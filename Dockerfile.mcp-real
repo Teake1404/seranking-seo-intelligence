@@ -1,0 +1,50 @@
+# Real MCP server with SEranking API integration
+FROM node:18-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Install dependencies
+RUN apk add --no-cache curl
+
+# Create package.json
+RUN echo '{"name": "mcp-server", "version": "1.0.0", "main": "server.js", "scripts": {"start": "node server.js"}, "dependencies": {"express": "^4.18.0", "axios": "^1.6.0"}}' > package.json
+
+# Install dependencies
+RUN npm install
+
+# Create real MCP server with SEranking API
+RUN echo 'const express = require("express");' > server.js && \
+    echo 'const axios = require("axios");' >> server.js && \
+    echo 'const app = express();' >> server.js && \
+    echo 'app.use(express.json());' >> server.js && \
+    echo 'const SERANKING_API_KEY = "b931695c-9e38-cde4-4d4b-49eeb217118f";' >> server.js && \
+    echo 'app.get("/health", (req, res) => {' >> server.js && \
+    echo '  res.json({status: "healthy", service: "seranking-mcp-real"});' >> server.js && \
+    echo '});' >> server.js && \
+    echo 'app.post("/mcp", async (req, res) => {' >> server.js && \
+    echo '  try {' >> server.js && \
+    echo '    const {params} = req.body;' >> server.js && \
+    echo '    if (params.tool_name === "domainKeywords") {' >> server.js && \
+    echo '      const response = await axios.get(`https://api4.seranking.com/v1/keywords/rankings?domain=${params.domain}&keywords=${params.keywords}`, {' >> server.js && \
+    echo '        headers: {"X-API-KEY": SERANKING_API_KEY}' >> server.js && \
+    echo '      });' >> server.js && \
+    echo '      res.json({result: {content: [{text: JSON.stringify(response.data)}]}});' >> server.js && \
+    echo '    } else {' >> server.js && \
+    echo '      res.json({result: {content: [{text: "[]"}]}});' >> server.js && \
+    echo '    }' >> server.js && \
+    echo '  } catch (error) {' >> server.js && \
+    echo '    console.error("MCP Error:", error.message);' >> server.js && \
+    echo '    res.json({result: {content: [{text: "[]"}]}});' >> server.js && \
+    echo '  }' >> server.js && \
+    echo '});' >> server.js && \
+    echo 'const port = process.env.PORT || 3000;' >> server.js && \
+    echo 'app.listen(port, "0.0.0.0", () => {' >> server.js && \
+    echo '  console.log(`Real MCP Server running on port ${port}`);' >> server.js && \
+    echo '});' >> server.js
+
+# Expose port
+EXPOSE 3000
+
+# Start server
+CMD ["npm", "start"]
