@@ -1,0 +1,13 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: seranking-seo-api-enhanced
+spec:
+  template:
+    spec:
+      containers:
+      - env:
+        - name: SERANKING_API_KEY
+          value: "b931695c-9e38-cde4-4d4b-49eeb217118f"
+        - name: ANTHROPIC_API_KEY
+          value: "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"
