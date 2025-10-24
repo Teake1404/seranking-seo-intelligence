@@ -6,7 +6,8 @@ spec:
   template:
     spec:
       containers:
-      - env:
+      - image: gcr.io/titanium-gadget-451710-i7/seranking-seo-api-enhanced
+        env:
         - name: SERANKING_API_KEY
           value: "b931695c-9e38-cde4-4d4b-49eeb217118f"
         - name: ANTHROPIC_API_KEY
