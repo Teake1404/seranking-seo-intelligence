@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  seo-api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - SERANKING_API_KEY=${SERANKING_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    depends_on:
+      - mcp-server
+    command: ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "2", "--threads", "4", "--timeout", "300", "enhanced_api_seranking:app"]
+
+  mcp-server:
+    image: node:18-alpine
+    working_dir: /app
+    volumes:
+      - ./seo-data-api-mcp-server:/app
+    environment:
+      - SERANKING_API_TOKEN=${SERANKING_API_KEY}
+      - SERANKING_API_BASE=https://api4.seranking.com
+    command: ["sh", "-c", "npm install && npm run build && node dist/index.js"]
+    ports:
+      - "3000:3000"

@@ -1,0 +1,50 @@
+# Dockerfile for Google Cloud Run Deployment - Enhanced SEO API with MCP
+FROM python:3.9-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Docker for MCP server
+RUN curl -fsSL https://get.docker.com -o get-docker.sh && \
+    sh get-docker.sh && \
+    rm get-docker.sh
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install additional dependencies for MCP
+RUN pip install --no-cache-dir docker
+
+# Copy application code
+COPY enhanced_api_seranking.py .
+COPY enhanced_claude_insights.py .
+COPY seo_opportunity_analysis.py .
+COPY seranking_mcp.py .
+COPY claude_insights.py .
+COPY redis_cache.py .
+COPY config.py .
+
+# Copy MCP setup script
+COPY setup_seranking_mcp.py .
+
+# Set up SEranking MCP server
+RUN python setup_seranking_mcp.py
+
+# Start MCP server in background and then start the API
+COPY start_services.sh .
+RUN chmod +x start_services.sh
+
+# Expose port for Cloud Run
+EXPOSE 8080
+
+# Start both MCP server and API
+CMD ["./start_services.sh"]
