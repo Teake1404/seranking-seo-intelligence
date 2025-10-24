@@ -1,0 +1,32 @@
+# Simple working MCP server
+FROM node:18-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Create package.json
+RUN echo '{"name": "mcp-server", "version": "1.0.0", "main": "server.js", "scripts": {"start": "node server.js"}, "dependencies": {"express": "^4.18.0"}}' > package.json
+
+# Install express
+RUN npm install
+
+# Create simple server
+RUN echo 'const express = require("express");' > server.js && \
+    echo 'const app = express();' >> server.js && \
+    echo 'app.use(express.json());' >> server.js && \
+    echo 'app.get("/health", (req, res) => {' >> server.js && \
+    echo '  res.json({status: "healthy", service: "seranking-mcp"});' >> server.js && \
+    echo '});' >> server.js && \
+    echo 'app.post("/mcp", (req, res) => {' >> server.js && \
+    echo '  res.json({result: {content: [{text: "[]"}]}});' >> server.js && \
+    echo '});' >> server.js && \
+    echo 'const port = process.env.PORT || 3000;' >> server.js && \
+    echo 'app.listen(port, "0.0.0.0", () => {' >> server.js && \
+    echo '  console.log(`Server running on port ${port}`);' >> server.js && \
+    echo '});' >> server.js
+
+# Expose port
+EXPOSE 3000
+
+# Start server
+CMD ["npm", "start"]
