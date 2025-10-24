@@ -1,0 +1,23 @@
+# Dockerfile for SEO Intelligence Demo (Lead Magnet)
+FROM python:3.9-slim
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy demo application code
+COPY seo_demo_api.py .
+COPY claude_insights.py .
+
+# Expose port for Cloud Run
+EXPOSE 8080
+
+# Run with gunicorn for production
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "2", "--threads", "4", "--timeout", "300", "seo_demo_api:app"]
+
+

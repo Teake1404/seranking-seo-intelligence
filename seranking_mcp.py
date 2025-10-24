@@ -11,6 +11,12 @@ import aiohttp
 import requests
 
 import config
+from redis_cache import (
+    get_cached_keyword_rankings, cache_keyword_rankings,
+    get_cached_competitor_rankings, cache_competitor_rankings,
+    get_cached_keyword_metrics, cache_keyword_metrics,
+    get_cached_competitor_summary, cache_competitor_summary
+)
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +97,7 @@ async def make_seranking_request(endpoint: str, params: Dict[str, Any] = None, m
 async def get_keyword_rankings(keywords: Optional[List[str]] = None, domain: Optional[str] = None) -> str:
     """
     Fetches current keyword rankings for a domain using SEranking SERP API
+    Uses Redis caching to improve performance and reduce API calls
     
     Args:
         keywords: List of keywords to check. If None, uses generic keywords
@@ -105,6 +112,13 @@ async def get_keyword_rankings(keywords: Optional[List[str]] = None, domain: Opt
         domain = config.TARGET_DOMAIN
     
     try:
+        # Check cache first
+        cached_data = await get_cached_keyword_rankings(keywords, domain)
+        if cached_data:
+            logger.info(f"🎯 Using cached keyword rankings for {domain}")
+            return json.dumps(cached_data, indent=2)
+        
+        logger.info(f"🔄 Fetching fresh keyword rankings for {domain} from SEranking API...")
         from datetime import datetime
         
         processed_data = {
@@ -179,6 +193,9 @@ async def get_keyword_rankings(keywords: Optional[List[str]] = None, domain: Opt
                     "error": "Timeout waiting for SERP results"
                 }
         
+        # Cache the results
+        await cache_keyword_rankings(keywords, domain, processed_data)
+        
         return json.dumps(processed_data, indent=2)
         
     except Exception as e:
@@ -187,6 +204,7 @@ async def get_keyword_rankings(keywords: Optional[List[str]] = None, domain: Opt
 async def get_competitor_rankings(competitors: Optional[List[str]] = None, keywords: Optional[List[str]] = None) -> str:
     """
     Tracks competitor keyword rankings using SEranking
+    Uses Redis caching to improve performance and reduce API calls
     
     Args:
         competitors: List of competitor domains
@@ -201,6 +219,13 @@ async def get_competitor_rankings(competitors: Optional[List[str]] = None, keywo
         keywords = config.GENERIC_KEYWORDS[:5]
     
     try:
+        # Check cache first
+        cached_data = await get_cached_competitor_rankings(competitors, keywords)
+        if cached_data:
+            logger.info(f"🎯 Using cached competitor rankings for {len(competitors)} competitors")
+            return json.dumps(cached_data, indent=2)
+        
+        logger.info(f"🔄 Fetching fresh competitor rankings from SEranking API...")
         from datetime import datetime
         import asyncio
         
@@ -268,6 +293,9 @@ async def get_competitor_rankings(competitors: Optional[List[str]] = None, keywo
                 else:
                     break
         
+        # Cache the results
+        await cache_competitor_rankings(competitors, keywords, processed_data)
+        
         return json.dumps(processed_data, indent=2)
         
     except Exception as e:
@@ -277,6 +305,7 @@ async def get_competitor_summary(domain: str, competitors: Optional[List[str]] =
     """
     Get competitor summary using SEranking's competitors endpoint
     Auto-discovers competitors if none provided
+    Uses Redis caching to improve performance and reduce API calls
     
     Args:
         domain: Target domain
@@ -286,6 +315,13 @@ async def get_competitor_summary(domain: str, competitors: Optional[List[str]] =
         JSON string with competitor data
     """
     try:
+        # Check cache first
+        cached_data = await get_cached_competitor_summary(domain, competitors or [])
+        if cached_data:
+            logger.info(f"🎯 Using cached competitor summary for {domain}")
+            return json.dumps(cached_data, indent=2)
+        
+        logger.info(f"🔄 Fetching fresh competitor summary for {domain} from SEranking API...")
         from datetime import datetime
         
         # If no competitors provided AND domain is set, auto-discover them
@@ -339,6 +375,9 @@ async def get_competitor_summary(domain: str, competitors: Optional[List[str]] =
                     "price_sum": 0
                 })
         
+        # Cache the results
+        await cache_competitor_summary(domain, competitors or [], competitor_data)
+        
         return json.dumps(competitor_data, indent=2)
         
     except Exception as e:
@@ -376,6 +415,7 @@ async def get_backlink_changes(domain: str = None) -> str:
 async def get_keyword_metrics(keywords: Optional[List[str]] = None) -> str:
     """
     Gets keyword difficulty and search volume metrics from SEranking
+    Uses Redis caching to improve performance and reduce API calls
     
     Args:
         keywords: List of keywords to analyze
@@ -387,6 +427,13 @@ async def get_keyword_metrics(keywords: Optional[List[str]] = None) -> str:
         keywords = config.GENERIC_KEYWORDS[:10]
     
     try:
+        # Check cache first
+        cached_data = await get_cached_keyword_metrics(keywords)
+        if cached_data:
+            logger.info(f"🎯 Using cached keyword metrics for {len(keywords)} keywords")
+            return json.dumps(cached_data, indent=2)
+        
+        logger.info(f"🔄 Fetching fresh keyword metrics from SEranking API...")
         from datetime import datetime
         
         processed_data = {
@@ -449,6 +496,9 @@ async def get_keyword_metrics(keywords: Optional[List[str]] = None) -> str:
                 raise Exception(f"JSON decode error: {e}, Response: {response.text}")
         else:
             raise Exception(f"SEranking API error {response.status_code}: {response.text}")
+        
+        # Cache the results
+        await cache_keyword_metrics(keywords, processed_data)
         
         return json.dumps(processed_data, indent=2)
         

@@ -69,6 +69,18 @@ MIN_VISIBILITY_CHANGE = 0.5  # Minimum visibility change to report
 DATAFORSEO_RATE_LIMIT = 1000  # requests per minute
 REQUEST_TIMEOUT = 300  # seconds (5 minutes for SEranking SERP processing)
 
+# Redis Cache Configuration
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+REDIS_CACHE_ENABLED = os.getenv("REDIS_CACHE_ENABLED", "true").lower() == "true"
+REDIS_CACHE_TTL = {
+    "rankings": 3600,           # 1 hour - rankings change frequently
+    "competitor_rankings": 3600, # 1 hour - competitor data
+    "keyword_metrics": 86400,    # 24 hours - metrics are stable
+    "competitor_summary": 86400, # 24 hours - competitor summaries
+    "backlinks": 43200,         # 12 hours - backlinks change slowly
+    "default": 1800             # 30 minutes - default fallback
+}
+
 # Report Configuration
 REPORT_EMOJI = "📊"
 REPORT_TITLE = "SEO DAILY BRIEF"

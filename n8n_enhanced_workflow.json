@@ -1,0 +1,246 @@
+{
+  "name": "Enhanced SEO Intelligence Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "value": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Daily SEO Analysis",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableName": "seo_historical_data",
+        "options": {
+          "limit": 30
+        }
+      },
+      "id": "get-historical-data",
+      "name": "Get 30 Day History",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://seranking-seo-api-enhanced-XXXXX.us-central1.run.app/api/enhanced-report",
+        "options": {
+          "timeout": 600000
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "domain",
+              "value": "{{ $json.domain || 'seranking.com' }}"
+            },
+            {
+              "name": "market", 
+              "value": "{{ $json.market || 'us' }}"
+            },
+            {
+              "name": "keywords",
+              "value": "{{ $json.keywords || ['seo tools', 'keyword research', 'seo analysis'] }}"
+            },
+            {
+              "name": "competitors",
+              "value": "{{ $json.competitors || ['ahrefs.com', 'semrush.com', 'moz.com'] }}"
+            },
+            {
+              "name": "historical_data",
+              "value": "{{ $json }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "call-enhanced-api",
+      "name": "Call Enhanced SEO API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "tableName": "seo_historical_data",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "domain": "={{ $json.data.domain }}",
+            "date": "={{ $json.date }}",
+            "keywords_tracked": "={{ $json.summary.keywords_tracked }}",
+            "page_1_keywords": "={{ $json.summary.page_1_keywords }}",
+            "visibility_score": "={{ $json.summary.visibility_score }}",
+            "opportunities_found": "={{ $json.summary.opportunities_found }}",
+            "lost_keywords": "={{ $json.summary.lost_keywords }}",
+            "declining_keywords": "={{ $json.summary.declining_keywords }}",
+            "anomalies_count": "={{ $json.summary.anomalies_count }}",
+            "rankings_data": "={{ JSON.stringify($json.data.rankings) }}",
+            "competitors_data": "={{ JSON.stringify($json.data.competitors) }}",
+            "opportunities_data": "={{ JSON.stringify($json.data.opportunities) }}",
+            "insights_data": "={{ JSON.stringify($json.insights) }}",
+            "opportunity_insights": "={{ JSON.stringify($json.opportunity_insights) }}",
+            "report": "={{ $json.report }}",
+            "timestamp": "={{ $json.timestamp }}"
+          }
+        }
+      },
+      "id": "store-enhanced-data",
+      "name": "Store Enhanced Data",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-1",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-success",
+      "name": "Check API Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "channel": "#seo-reports",
+        "text": "🚀 **Enhanced SEO Intelligence Report**\n\n📊 **Performance Summary:**\n• {{ $json.summary.keywords_tracked }} keywords tracked\n• {{ $json.summary.page_1_keywords }} keywords on page 1\n• Visibility score: {{ $json.summary.visibility_score }}%\n• {{ $json.summary.anomalies_count }} anomalies detected\n\n💡 **Opportunity Analysis:**\n• {{ $json.summary.opportunities_found }} low-hanging fruit opportunities\n• {{ $json.summary.lost_keywords }} lost keywords identified\n• {{ $json.summary.declining_keywords }} declining keywords found\n\n🎯 **Priority Actions:**\n{{ $json.opportunity_insights.priority_actions.map(action => '• ' + action).join('\\n') }}\n\n📈 **Content Opportunities:**\n{{ $json.opportunity_insights.content_opportunities.map(opp => '• ' + opp).join('\\n') }}\n\n🏆 **Competitive Gaps:**\n{{ $json.opportunity_insights.competitive_gaps.map(gap => '• ' + gap).join('\\n') }}\n\n🤖 **AI Insights:**\n{{ $json.insights.critical_changes.slice(0, 3).map(change => '• ' + change).join('\\n') }}\n\n📋 **Full Report:**\n{{ $json.report.substring(0, 1000) }}...\n\n---\nGenerated: {{ $json.timestamp }}\nData: SEranking MCP + Claude AI\nVersion: Enhanced 2.0",
+        "otherOptions": {
+          "mrkdwn": true
+        }
+      },
+      "id": "send-slack-report",
+      "name": "Send Enhanced Slack Report",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.1,
+      "position": [1340, 200]
+    },
+    {
+      "parameters": {
+        "channel": "#seo-alerts",
+        "text": "❌ **SEO API Error**\n\nFailed to generate enhanced SEO report.\n\nError: {{ $json.error }}\nTimestamp: {{ $json.timestamp }}\n\nPlease check the API logs and try again.",
+        "otherOptions": {
+          "mrkdwn": true
+        }
+      },
+      "id": "send-error-alert",
+      "name": "Send Error Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.1,
+      "position": [1340, 400]
+    }
+  ],
+  "connections": {
+    "Daily SEO Analysis": {
+      "main": [
+        [
+          {
+            "node": "Get 30 Day History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get 30 Day History": {
+      "main": [
+        [
+          {
+            "node": "Call Enhanced SEO API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Enhanced SEO API": {
+      "main": [
+        [
+          {
+            "node": "Store Enhanced Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Enhanced Data": {
+      "main": [
+        [
+          {
+            "node": "Check API Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check API Success": {
+      "main": [
+        [
+          {
+            "node": "Send Enhanced Slack Report",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Error Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-10-24T00:24:00.000Z",
+  "versionId": "enhanced-v2.0"
+}
+

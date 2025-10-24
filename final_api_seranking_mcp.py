@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-SEO Intelligence API for Google Cloud Run - SEranking Version
-- Fetches data from SEranking
+SEO Intelligence API for Google Cloud Run - SEranking MCP Version
+- Uses official SEranking MCP server for reliable data access
 - Detects anomalies using historical data from n8n
 - Generates Claude AI insights
 - Returns complete report to n8n
@@ -15,9 +15,14 @@ from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 
 # Import SEranking MCP functions
-from seranking_mcp import get_keyword_rankings, get_competitor_rankings, get_keyword_metrics
+from seranking_mcp_integration import (
+    get_keyword_rankings_mcp, 
+    get_competitor_rankings_mcp, 
+    get_keyword_metrics_mcp,
+    get_competitor_summary_mcp,
+    check_mcp_health
+)
 from claude_insights import generate_claude_insights
-from redis_cache import get_cache
 import config
 
 # Initialize Flask
@@ -202,77 +207,39 @@ def calculate_anomalies_from_history(historical_data: list) -> list:
 @app.route('/', methods=['GET'])
 def home():
     """Root endpoint"""
-    cache = get_cache()
-    cache_status = "enabled" if cache.is_available() else "disabled"
-    
     return jsonify({
-        "service": "SEO Intelligence API - SEranking Version",
+        "service": "SEO Intelligence API - SEranking MCP Version",
         "status": "running",
-        "version": "1.1",
-        "data_provider": "SEranking",
-        "architecture": "Stateless API + n8n Database + Redis Cache",
-        "cache": cache_status,
+        "version": "2.0",
+        "data_provider": "SEranking MCP",
+        "architecture": "Stateless API + n8n Database + SEranking MCP",
         "endpoints": {
             "health": "/health",
             "generate_report": "/api/generate-report (POST)",
-            "cache_stats": "/api/cache/stats (GET)",
-            "cache_invalidate": "/api/cache/invalidate (POST)"
+            "mcp_health": "/api/mcp-health (GET)"
         }
     })
 
 @app.route('/health', methods=['GET'])
 def health():
     """Health check"""
-    cache = get_cache()
-    cache_status = "enabled" if cache.is_available() else "disabled"
-    
     return jsonify({
         "status": "healthy",
         "service": "SEO Intelligence API",
-        "data_provider": "SEranking",
-        "cache": cache_status,
+        "data_provider": "SEranking MCP",
         "timestamp": datetime.now().isoformat()
     })
 
-@app.route('/api/cache/stats', methods=['GET'])
-def cache_stats():
-    """Get Redis cache statistics"""
+@app.route('/api/mcp-health', methods=['GET'])
+def mcp_health():
+    """Check SEranking MCP server health"""
     try:
-        cache = get_cache()
-        stats = run_async(cache.get_stats())
-        return jsonify({
-            "success": True,
-            "cache_stats": stats,
-            "timestamp": datetime.now().isoformat()
-        })
+        health_status = run_async(check_mcp_health())
+        return jsonify(health_status)
     except Exception as e:
         return jsonify({
-            "success": False,
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
-        }), 500
-
-@app.route('/api/cache/invalidate', methods=['POST'])
-def invalidate_cache():
-    """Invalidate Redis cache"""
-    try:
-        data = request.json or {}
-        data_type = data.get('data_type')  # Optional: specific data type
-        pattern = data.get('pattern')      # Optional: custom pattern
-        
-        cache = get_cache()
-        deleted_count = run_async(cache.invalidate(data_type, pattern))
-        
-        return jsonify({
-            "success": True,
-            "deleted_keys": deleted_count,
-            "data_type": data_type,
-            "pattern": pattern,
-            "timestamp": datetime.now().isoformat()
-        })
-    except Exception as e:
-        return jsonify({
-            "success": False,
+            "status": "unhealthy",
+            "mcp_server": "disconnected",
             "error": str(e),
             "timestamp": datetime.now().isoformat()
         }), 500
@@ -280,7 +247,7 @@ def invalidate_cache():
 @app.route('/api/generate-report', methods=['POST'])
 def generate_report():
     """
-    Complete SEO report generation using SEranking
+    Complete SEO report generation using SEranking MCP
     
     n8n sends:
       - keywords to fetch
@@ -293,7 +260,7 @@ def generate_report():
       - formatted report
     """
     try:
-        logger.info("🚀 Generating SEO report (SEranking)...")
+        logger.info("🚀 Generating SEO report (SEranking MCP)...")
         
         # Get request data from n8n or user
         data = request.json or {}
@@ -303,22 +270,11 @@ def generate_report():
         keywords = data.get('keywords', config.GENERIC_KEYWORDS)  # Use ALL keywords from config
         
         # Competitors: Use provided list, or config defaults
-        # Only auto-discover if explicitly requested with empty list AND auto_discover flag
-        competitors = data.get('competitors')
-        auto_discover = data.get('auto_discover_competitors', False)
-        
-        if competitors is None:
-            # No competitors provided - use config defaults
-            competitors = config.COMPETITOR_DOMAINS  # Use ALL competitors from config
-        elif len(competitors) == 0 and not auto_discover:
-            # Empty list but no auto-discover flag - use config defaults
-            competitors = config.COMPETITOR_DOMAINS  # Use ALL competitors from config
-        # else: use the provided competitors list (even if empty with auto_discover flag)
+        competitors = data.get('competitors', config.COMPETITOR_DOMAINS)
         
         historical_data = data.get('historical_data', [])  # n8n sends this
         
         # Priority-based keyword filtering
-        # Use provided priorities, or defaults from config, or auto-assign "medium"
         keyword_priorities = data.get('keyword_priorities', config.DEFAULT_KEYWORD_PRIORITIES)
         check_frequency = data.get('check_frequency', 'daily')  # daily, weekly, monthly
         
@@ -335,21 +291,18 @@ def generate_report():
                     filtered_keywords.append(keyword)
             keywords = filtered_keywords if filtered_keywords else keywords
         
-        logger.info(f"📊 Fetching fresh data for {len(keywords)} keywords from SEranking...")
+        logger.info(f"📊 Fetching fresh data for {len(keywords)} keywords from SEranking MCP...")
         
-        # Fetch fresh data from SEranking IN PARALLEL (pass domain to functions)
-        logger.info("🚀 Running SEranking API calls in parallel for speed...")
-        
-        import asyncio
-        from seranking_mcp import get_competitor_summary
+        # Fetch fresh data from SEranking MCP IN PARALLEL
+        logger.info("🚀 Running SEranking MCP calls in parallel for speed...")
         
         async def fetch_all_data():
             """Fetch all SEranking data in parallel to save time"""
             tasks = [
-                get_keyword_rankings(keywords, target_domain),
-                get_competitor_rankings(competitors, keywords),
-                get_keyword_metrics(keywords),
-                get_competitor_summary(target_domain, competitors)
+                get_keyword_rankings_mcp(keywords, target_domain),
+                get_competitor_rankings_mcp(competitors, keywords),
+                get_keyword_metrics_mcp(keywords),
+                get_competitor_summary_mcp(target_domain, competitors)
             ]
             return await asyncio.gather(*tasks)
         
@@ -410,7 +363,7 @@ def generate_report():
         visibility_score = round(total_score / total_keywords, 1) if total_keywords > 0 else 0
         
         # Format report  
-        report = f"""📊 SEO DAILY BRIEF (SEranking)
+        report = f"""📊 SEO DAILY BRIEF (SEranking MCP)
 
 📊 PERFORMANCE SUMMARY:
 • {page_1_keywords}/{total_keywords} keywords on page 1
@@ -496,7 +449,7 @@ def generate_report():
             for i, rec in enumerate(insights['recommendations'][:5], 1):
                 report += f"{i}. {rec}\n"
         
-        report += f"\n---\nGenerated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\nData: SEranking\nAI: {insights.get('model')}"
+        report += f"\n---\nGenerated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\nData: SEranking MCP\nAI: {insights.get('model')}"
         
         # Prepare enriched data for n8n Data Table storage
         enriched_rankings = []
@@ -545,11 +498,11 @@ def generate_report():
             "success": True,
             "timestamp": datetime.now().isoformat(),
             "date": datetime.now().strftime("%Y-%m-%d"),
-            "data_provider": "SEranking",
+            "data_provider": "SEranking MCP",
             "report": report,
             "data": {
                 "rankings": ranking_json,
-                "enriched_rankings": enriched_rankings,  # NEW: Ready for Data Table
+                "enriched_rankings": enriched_rankings,  # Ready for Data Table
                 "competitors": competitor_json,
                 "competitor_summary": competitor_summary_json,
                 "metrics": metrics_json
@@ -584,11 +537,10 @@ def generate_report():
 # For Google Cloud Run
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
-    logger.info(f"🚀 Starting SEO API (SEranking) on port {port}")
-    logger.info(f"   Data Provider: SEranking")
+    logger.info(f"🚀 Starting SEO API (SEranking MCP) on port {port}")
+    logger.info(f"   Data Provider: SEranking MCP")
     logger.info(f"   Stateless: Yes")
     logger.info(f"   Storage: Handled by n8n")
     logger.info(f"   Anomaly Detection: In API")
     app.run(host='0.0.0.0', port=port, debug=False)
-
 
