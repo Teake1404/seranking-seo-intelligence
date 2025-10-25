@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Simple working API for AI insights - no suspension issues
+SEO Insights API for Google Cloud Run
 """
 import json
 import os
@@ -9,6 +9,9 @@ from datetime import datetime
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
+
+# Remove any config imports that might cause issues
+# This API uses its own AI insights logic, no external API keys needed
 
 def parse_n8n_data(raw_data):
     """Parse the raw data from n8n SEranking MCP"""
@@ -74,54 +77,81 @@ def parse_n8n_competitors_data(raw_data):
         print(f"Error parsing competitors data: {e}")
         return []
 
-def generate_simple_insights(rankings_data, competitors_data, domain):
-    """Generate simple AI insights without external dependencies"""
+def generate_claude_insights(rankings_data, competitors_data, domain):
+    """Generate AI insights using Claude AI"""
+    import anthropic
     
-    # Basic analysis
-    total_keywords = len(rankings_data)
-    page_1_keywords = sum(1 for item in rankings_data if item.get('position', 0) <= 10 and item.get('position', 0) > 0)
+    # Initialize Claude client
+    client = anthropic.Anthropic(
+        api_key=os.getenv('ANTHROPIC_API_KEY')
+    )
     
-    # Calculate visibility score
-    visibility_score = 0.0
-    if total_keywords > 0:
-        for item in rankings_data:
-            pos = item.get('position', 0)
-            if pos > 0 and pos <= 100:
-                visibility_score += (101 - pos)
-        visibility_score = (visibility_score / (total_keywords * 100)) * 100
-    
-    # Top competitors analysis
-    top_competitors = competitors_data[:5] if competitors_data else []
-    
-    # Generate insights
-    insights = []
-    
-    if page_1_keywords > 0:
-        insights.append(f"✅ {page_1_keywords} keywords are ranking on page 1")
-    
-    if visibility_score > 50:
-        insights.append(f"🎯 Strong visibility score: {visibility_score:.1f}%")
-    elif visibility_score > 25:
-        insights.append(f"📈 Moderate visibility score: {visibility_score:.1f}%")
-    else:
-        insights.append(f"⚠️ Low visibility score: {visibility_score:.1f}% - needs improvement")
-    
-    if top_competitors:
-        top_comp = top_competitors[0]
-        insights.append(f"🏆 Top competitor: {top_comp.get('domain', 'Unknown')} with {top_comp.get('common_keywords', 0):,} common keywords")
-    
-    # Keyword opportunities
-    high_volume_keywords = [item for item in rankings_data if item.get('volume', 0) > 1000 and item.get('position', 0) > 10]
-    if high_volume_keywords:
-        insights.append(f"💡 {len(high_volume_keywords)} high-volume keywords not in top 10 - opportunity!")
-    
-    return {
-        "total_keywords": total_keywords,
-        "page_1_keywords": page_1_keywords,
-        "visibility_score": round(visibility_score, 2),
-        "insights": insights,
-        "top_competitors": top_competitors
+    # Prepare data for Claude
+    data_summary = {
+        "domain": domain,
+        "total_keywords": len(rankings_data),
+        "rankings": rankings_data[:10],  # Top 10 for context
+        "competitors": competitors_data[:5]  # Top 5 competitors
     }
+    
+    # Create prompt for Claude
+    prompt = f"""You are an SEO expert analyzing data for {domain}. 
+
+Data Summary:
+- Total keywords tracked: {data_summary['total_keywords']}
+- Top rankings: {json.dumps(data_summary['rankings'], indent=2)}
+- Top competitors: {json.dumps(data_summary['competitors'], indent=2)}
+
+Please provide:
+1. Executive summary of SEO performance
+2. Top 3 actionable recommendations
+3. Competitive insights
+4. Priority areas for improvement
+
+Format your response as a comprehensive SEO report with clear sections and actionable insights."""
+
+    try:
+        # Call Claude AI
+        response = client.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=2000,
+            messages=[{
+                "role": "user",
+                "content": prompt
+            }]
+        )
+        
+        claude_insights = response.content[0].text
+        
+        # Basic metrics for structure
+        total_keywords = len(rankings_data)
+        page_1_keywords = sum(1 for item in rankings_data if item.get('position', 0) <= 10 and item.get('position', 0) > 0)
+        
+        # Calculate visibility score
+        visibility_score = 0.0
+        if total_keywords > 0:
+            for item in rankings_data:
+                pos = item.get('position', 0)
+                if pos > 0 and pos <= 100:
+                    visibility_score += (101 - pos)
+            visibility_score = (visibility_score / (total_keywords * 100)) * 100
+        
+        return {
+            "total_keywords": total_keywords,
+            "page_1_keywords": page_1_keywords,
+            "visibility_score": round(visibility_score, 2),
+            "claude_insights": claude_insights,
+            "top_competitors": competitors_data[:5] if competitors_data else []
+        }
+        
+    except Exception as e:
+        return {
+            "error": f"Claude AI analysis failed: {str(e)}",
+            "total_keywords": len(rankings_data),
+            "page_1_keywords": 0,
+            "visibility_score": 0,
+            "claude_insights": "Unable to generate AI insights due to API error."
+        }
 
 @app.route('/', methods=['GET'])
 def home():
@@ -163,23 +193,22 @@ def generate_ai_insights():
         
         print(f"Parsed {len(rankings_data)} rankings and {len(competitors_data)} competitors")
         
-        # Generate insights
-        insights = generate_simple_insights(rankings_data, competitors_data, domain)
+        # Generate insights using Claude AI
+        insights = generate_claude_insights(rankings_data, competitors_data, domain)
         
-        # Create report
+        # Create report with Claude insights
         report = f"""📊 AI INSIGHTS REPORT - {domain.upper()}
 
 📈 PERFORMANCE SUMMARY:
 • {insights['page_1_keywords']}/{insights['total_keywords']} keywords on page 1
 • Visibility score: {insights['visibility_score']}%
 
-🎯 KEY INSIGHTS:"""
+🤖 CLAUDE AI INSIGHTS:
+{insights.get('claude_insights', 'No insights available')}
+
+🏆 TOP COMPETITORS:"""
         
-        for insight in insights['insights']:
-            report += f"\n• {insight}"
-        
-        if insights['top_competitors']:
-            report += "\n\n🏆 TOP COMPETITORS:"
+        if insights.get('top_competitors'):
             for comp in insights['top_competitors'][:3]:
                 report += f"\n• {comp.get('domain', 'Unknown')}: {comp.get('common_keywords', 0):,} common keywords"
         
