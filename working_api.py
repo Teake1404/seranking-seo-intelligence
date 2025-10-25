@@ -21,23 +21,20 @@ def parse_n8n_data(raw_data):
             
         print(f"Raw data: {raw_data[:200]}...")
         
-        # First parse the outer JSON to get the text field
-        outer_json_match = re.search(r'\{.*\}', raw_data, re.DOTALL)
-        if outer_json_match:
-            outer_json_str = outer_json_match.group()
-            outer_data = json.loads(outer_json_str)
-            
-            # Extract the text field which contains the actual data
-            if 'result' in outer_data and 'content' in outer_data['result']:
-                content = outer_data['result']['content']
-                if content and len(content) > 0 and 'text' in content[0]:
-                    text_data = content[0]['text']
-                    print(f"Extracted text: {text_data[:100]}...")
-                    
-                    # Parse the inner JSON array
-                    inner_data = json.loads(text_data)
-                    print(f"Parsed {len(inner_data)} items")
-                    return inner_data
+        # Find the text field content directly
+        if '"text":"' in raw_data:
+            start = raw_data.find('"text":"') + 8
+            end = raw_data.find('"}]}', start)
+            if end == -1:
+                end = raw_data.find('"}]', start)
+            if end != -1:
+                text_content = raw_data[start:end]
+                print(f"Extracted text: {text_content[:100]}...")
+                
+                # Parse the JSON array
+                inner_data = json.loads(text_content)
+                print(f"Parsed {len(inner_data)} items")
+                return inner_data
         
         print("No valid data found")
         return []
@@ -53,23 +50,20 @@ def parse_n8n_competitors_data(raw_data):
             
         print(f"Competitors raw data: {raw_data[:200]}...")
         
-        # First parse the outer JSON to get the text field
-        outer_json_match = re.search(r'\{.*\}', raw_data, re.DOTALL)
-        if outer_json_match:
-            outer_json_str = outer_json_match.group()
-            outer_data = json.loads(outer_json_str)
-            
-            # Extract the text field which contains the actual data
-            if 'result' in outer_data and 'content' in outer_data['result']:
-                content = outer_data['result']['content']
-                if content and len(content) > 0 and 'text' in content[0]:
-                    text_data = content[0]['text']
-                    print(f"Extracted competitors text: {text_data[:100]}...")
-                    
-                    # Parse the inner JSON array
-                    inner_data = json.loads(text_data)
-                    print(f"Parsed {len(inner_data)} competitors")
-                    return inner_data
+        # Find the text field content directly
+        if '"text":"' in raw_data:
+            start = raw_data.find('"text":"') + 8
+            end = raw_data.find('"}]}', start)
+            if end == -1:
+                end = raw_data.find('"}]', start)
+            if end != -1:
+                text_content = raw_data[start:end]
+                print(f"Extracted competitors text: {text_content[:100]}...")
+                
+                # Parse the JSON array
+                inner_data = json.loads(text_content)
+                print(f"Parsed {len(inner_data)} competitors")
+                return inner_data
         
         print("No valid competitors data found")
         return []
