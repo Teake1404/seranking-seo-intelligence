@@ -14,7 +14,7 @@ from flask_cors import CORS
 
 # Import our modules
 from enhanced_claude_insights import generate_enhanced_claude_insights
-from seo_opportunity_analysis import analyze_seo_opportunities
+from seo_opportunity_analysis import SEOOpportunityAnalyzer
 import config
 
 # Initialize Flask
@@ -69,7 +69,8 @@ def seo_opportunities_endpoint():
 
     try:
         logger.info(f"Starting SEO opportunity analysis for domain: {domain}, market: {market}")
-        opportunity_results = analyze_seo_opportunities(domain, market)
+        analyzer = SEOOpportunityAnalyzer(config.SERANKING_API_TOKEN)
+        opportunity_results = analyzer.analyze_domain_performance()
         return jsonify({
             "success": True, 
             "domain": domain, 
@@ -162,7 +163,12 @@ def generate_ai_insights():
 
         # 3. SEO Opportunity Analysis
         logger.info("Performing SEO opportunity analysis...")
-        opportunity_analysis_results = analyze_seo_opportunities(domain, market)
+        try:
+            analyzer = SEOOpportunityAnalyzer(config.SERANKING_API_TOKEN)
+            opportunity_analysis_results = analyzer.analyze_domain_performance()
+        except Exception as e:
+            logger.warning(f"SEO opportunity analysis failed: {e}")
+            opportunity_analysis_results = {"error": str(e)}
 
         # 4. Generate Enhanced Claude AI Insights
         logger.info("Generating enhanced Claude AI insights...")
