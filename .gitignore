@@ -1,14 +1,3 @@
-# Environment variables and secrets
-.env
-.env.local
-.env.production
-*.env
-
-# API Keys and sensitive data
-config_local.py
-secrets.json
-api_keys.txt
-
 # Python
 __pycache__/
 *.py[cod]
@@ -59,32 +48,13 @@ Thumbs.db
 *.log
 logs/
 
-# Test files
-test_*.py
-*_test.py
-test_seranking_api.py
-test_seranking_api_v2.py
-test_mcp_direct.py
-test_mcp_connection.py
-test_mcp_proper.py
-test_real_seo_tool.py
-test_enhanced_api.py
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-# Temporary files
-*.tmp
-*.temp
-temp/
-tmp/
-
-# Docker
-.dockerignore
-
-# n8n
-n8n_workflow_backup.json
-
-# Reports
-seo_opportunity_report.md
-*.md.backup
-
-# SEranking MCP server
-seo-data-api-mcp-server/
+# MCP specific
+mcp_config.json
+*.pid
