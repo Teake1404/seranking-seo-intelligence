@@ -69,8 +69,13 @@ def seo_opportunities_endpoint():
 
     try:
         logger.info(f"Starting SEO opportunity analysis for domain: {domain}, market: {market}")
-        analyzer = SEOOpportunityAnalyzer(config.SERANKING_API_TOKEN)
-        opportunity_results = analyzer.analyze_domain_performance()
+        seranking_token = os.getenv('SERANKING_API_TOKEN', config.SERANKING_API_TOKEN if hasattr(config, 'SERANKING_API_TOKEN') else None)
+        if seranking_token:
+            analyzer = SEOOpportunityAnalyzer(seranking_token)
+            opportunity_results = analyzer.analyze_domain_performance()
+        else:
+            opportunity_results = {"error": "SERANKING_API_TOKEN not configured"}
+        
         return jsonify({
             "success": True, 
             "domain": domain, 
@@ -164,8 +169,12 @@ def generate_ai_insights():
         # 3. SEO Opportunity Analysis
         logger.info("Performing SEO opportunity analysis...")
         try:
-            analyzer = SEOOpportunityAnalyzer(config.SERANKING_API_TOKEN)
-            opportunity_analysis_results = analyzer.analyze_domain_performance()
+            seranking_token = os.getenv('SERANKING_API_TOKEN', config.SERANKING_API_TOKEN if hasattr(config, 'SERANKING_API_TOKEN') else None)
+            if seranking_token:
+                analyzer = SEOOpportunityAnalyzer(seranking_token)
+                opportunity_analysis_results = analyzer.analyze_domain_performance()
+            else:
+                opportunity_analysis_results = {"error": "SERANKING_API_TOKEN not configured"}
         except Exception as e:
             logger.warning(f"SEO opportunity analysis failed: {e}")
             opportunity_analysis_results = {"error": str(e)}
